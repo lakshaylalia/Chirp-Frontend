@@ -1,0 +1,18 @@
+import { Navigate, Outlet } from "react-router-dom";
+import { useUser } from "../features/authenication/useUser";
+
+function ProtectedRoute() {
+    const { user, isLoading, isError } = useUser();
+
+    if (isLoading) {
+        return <div>Loading...</div>;
+    }
+
+    if (isError || !user) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <Outlet />;
+}
+
+export default ProtectedRoute;

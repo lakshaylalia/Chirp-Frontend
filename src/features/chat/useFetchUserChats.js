@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getUserChats } from "../../services/apiChat";
 import { useSocket } from "../../context/SocketContext";
 
-export function useFetchUserChats(activeFriendId = null) {
+export function useFetchUserChats(activeFriendId = null, currentUserId) {
     const { socket } = useSocket();
     const queryClient = useQueryClient();
 
@@ -12,23 +12,45 @@ export function useFetchUserChats(activeFriendId = null) {
         activeFriendIdRef.current = activeFriendId;
     }, [activeFriendId]);
 
-    const { data: chats = [], isLoading, error } = useQuery({
+    const {
+        data: chats = [],
+        isLoading,
+        error,
+    } = useQuery({
         queryKey: ["userChats"],
-        queryFn: getUserChats,
+        enabled: !!currentUserId,
+        queryFn: async () => {
+            const conversations = await getUserChats();
+
+            return conversations.map((conv) => {
+                const friend = conv.participants.find(
+                    (p) => (p._id || p).toString() !== currentUserId.toString(),
+                );
+
+                return {
+                    friendId: (friend._id || friend).toString(),
+                    user: {
+                        name: friend.userName,
+                        avatarImage: friend.avatarImage ?? null,
+                    },
+                    lastMessage: conv.lastMessage ?? null,
+                    unreadCount: 0,
+                    isOnline: false,
+                    _raw: conv,
+                };
+            });
+        },
     });
 
-    // Reset unread count when user opens a chat
+    // Reset unread when chat is opened
     useEffect(() => {
         if (!activeFriendId) return;
 
         queryClient.setQueryData(["userChats"], (oldChats) => {
-        if (!oldChats) return [];
-        return oldChats.map((chat) => {
-            const isActiveChat = chat.participants?.some(
-            (p) => (p._id || p).toString() === activeFriendId
+            if (!oldChats) return [];
+            return oldChats.map((chat) =>
+                chat.friendId === activeFriendId ? { ...chat, unreadCount: 0 } : chat,
             );
-            return isActiveChat ? { ...chat, unreadCount: 0 } : chat;
-        });
         });
     }, [activeFriendId, queryClient]);
 
@@ -36,39 +58,35 @@ export function useFetchUserChats(activeFriendId = null) {
         if (!socket) return;
 
         function handleIncomingMessage(newMessage) {
-        queryClient.setQueryData(["userChats"], (oldChats) => {
-            if (!oldChats) return [];
+            queryClient.setQueryData(["userChats"], (oldChats) => {
+                if (!oldChats) return [];
 
-            const updated = oldChats.map((chat) => {
-            // match conversation by checking participants contains the sender
-            const isThisChat = chat.participants?.some(
-                (p) => (p._id || p).toString() === (newMessage.sender?._id || newMessage.sender).toString()
-            );
+                const senderId = (
+                    newMessage.sender?._id || newMessage.sender
+                ).toString();
 
-            if (!isThisChat) return chat;
+                const updated = oldChats.map((chat) => {
+                    if (chat.friendId !== senderId) return chat;
 
-            // check against sender's _id not chatId
-            const isBackground =
-                activeFriendIdRef.current !==
-                (newMessage.sender?._id || newMessage.sender).toString();
+                    const isBackground = activeFriendIdRef.current !== senderId;
 
-            return {
-                ...chat,
-                lastMessage: newMessage,
-                unreadCount: isBackground ? (chat.unreadCount || 0) + 1 : 0,
-            };
+                    return {
+                        ...chat,
+                        lastMessage: newMessage,
+                        unreadCount: isBackground ? (chat.unreadCount || 0) + 1 : 0,
+                    };
+                });
+
+                return updated.sort((a, b) => {
+                    const timeA = a.lastMessage?.createdAt
+                        ? new Date(a.lastMessage.createdAt)
+                        : 0;
+                    const timeB = b.lastMessage?.createdAt
+                        ? new Date(b.lastMessage.createdAt)
+                        : 0;
+                    return timeB - timeA;
+                });
             });
-
-            return updated.sort((a, b) => {
-            const timeA = a.lastMessage?.createdAt
-                ? new Date(a.lastMessage.createdAt)
-                : 0;
-            const timeB = b.lastMessage?.createdAt
-                ? new Date(b.lastMessage.createdAt)
-                : 0;
-            return timeB - timeA;
-            });
-        });
         }
 
         socket.on("newMessage", handleIncomingMessage);

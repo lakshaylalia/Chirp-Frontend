@@ -8,6 +8,7 @@ import { SocketContextProvider } from "./context/SocketContext";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import ChatPage from "./pages/ChatPage";
+import ProfilePage from "./pages/ProfilePage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -26,8 +27,11 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route element={<ProtectedRoute />}>
-              <Route index element={<Navigate replace to="/chat" />} />
-              <Route path="/chat" element={<ChatPage />} />
+              <Route index element={<Navigate replace to="/inbox" />} />
+              <Route path="/inbox" element={<ChatPage />} />
+              <Route path="/chat/:friendName" element={<ChatPage />} />
+              <Route path="/group/:groupId" element={<ChatPage />} />
+              <Route path="/user/:userName" element={<ProfilePage />} />
             </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />

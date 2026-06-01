@@ -1,53 +1,53 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { getMessages, sendMessage } from "../../services/apiMessages";
+import { getMessages, sendMessage, sendGroupMessage } from "../../services/apiMessages";
 import { useSocket } from "../../context/SocketContext";
 
-export function useFetchMessages(friendId) {
+export function useFetchMessages(friendId, currentUserId, groupId = null) {
     const { socket } = useSocket();
     const queryClient = useQueryClient();
 
+    const isGroupChat = !!groupId;
+
     const { data: messages = [], isLoading, error } = useQuery({
-        queryKey: ["messages", friendId],
-        queryFn: () => getMessages(friendId),
-        enabled: !!friendId,
+        queryKey: isGroupChat ? ["groupMessages", groupId] : ["messages", friendId],
+        queryFn: () => isGroupChat ? getMessages(groupId, true) : getMessages(friendId),
+        enabled: !!friendId || !!groupId,
+        staleTime: 1000 * 60 * 5
     });
 
     const { mutate: handleSendMessage, isPending: isSending } = useMutation({
-        mutationFn: (text) => sendMessage({ receiverId: friendId, message: text }),
+        mutationFn: (text) => isGroupChat
+            ? sendGroupMessage({ groupId, message: text })
+            : sendMessage({ receiverId: friendId, message: text }),
 
         onMutate: async (text) => {
-        const tempMessage = {
-            id: `temp_${Date.now()}`,
-            message: text,     
-            sender: "me",
-            createdAt: new Date().toISOString(),
-            pending: true,
-        };
-        queryClient.setQueryData(["messages", friendId], (old = []) => [
-            ...old,
-            tempMessage,
-        ]);
-        return { tempMessage };
+            const queryKey = isGroupChat ? ["groupMessages", groupId] : ["messages", friendId];
+            const tempMessage = {
+                _id: `temp_${Date.now()}`,
+                message: text,
+                sender: currentUserId,
+                createdAt: new Date().toISOString(),
+                pending: true,
+                ...(isGroupChat && { isGroupMessage: true }),
+            };
+            queryClient.setQueryData(queryKey, (old = []) => [
+                ...old,
+                tempMessage,
+            ]);
+            return { tempMessage, queryKey };
         },
 
         onSuccess: (savedMessage, _, context) => {
-        // Replace temp with real message
-        queryClient.setQueryData(["messages", friendId], (old = []) =>
-            old.map((m) => (m.id === context.tempMessage.id ? savedMessage : m))
-        );
-        // Update sidebar last message
-        queryClient.setQueryData(["userChats"], (oldChats = []) =>
-            oldChats.map((chat) =>
-            chat._id === friendId ? { ...chat, lastMessage: savedMessage } : chat
-            )
-        );
+            queryClient.setQueryData(context.queryKey, (old = []) =>
+                old.map((m) => (m._id === context.tempMessage._id ? savedMessage : m))
+            );
         },
 
         onError: (_, __, context) => {
-        queryClient.setQueryData(["messages", friendId], (old = []) =>
-            old.filter((m) => m.id !== context.tempMessage.id)
-        );
+            queryClient.setQueryData(context.queryKey, (old = []) =>
+                old.filter((m) => m._id !== context.tempMessage._id)
+            );
         },
     });
 
@@ -55,38 +55,31 @@ export function useFetchMessages(friendId) {
         if (!socket) return;
 
         const handleNewMessage = (newMessage) => {
-        if (
-            newMessage.sender._id === friendId ||
-            newMessage.sender === friendId
-        ) {
-            queryClient.setQueryData(["messages", friendId], (old = []) => {
-            const exists = old.some((m) => m._id === newMessage._id);
-            if (exists) return old;
-            return [...old, newMessage];
-            });
-        }
-
-        // Always update sidebar
-        queryClient.setQueryData(["userChats"], (oldChats = []) => {
-            if (!oldChats) return [];
-            const updated = oldChats.map((chat) => {
-            const isThisChat = chat.participants?.some(
-                (p) => p._id === newMessage.sender._id || p === newMessage.sender
-            );
-            if (!isThisChat) return chat;
-            return { ...chat, lastMessage: newMessage };
-            });
-            return updated.sort(
-            (a, b) =>
-                new Date(b.lastMessage?.createdAt) -
-                new Date(a.lastMessage?.createdAt)
-            );
-        });
+            if (isGroupChat) {
+                if (newMessage.groupId === groupId) {
+                    queryClient.setQueryData(["groupMessages", groupId], (old = []) => {
+                        const exists = old.some((m) => m._id === newMessage._id);
+                        if (exists) return old;
+                        return [...old, newMessage];
+                    });
+                }
+            } else {
+                if (
+                    newMessage.sender._id === friendId ||
+                    newMessage.sender === friendId
+                ) {
+                    queryClient.setQueryData(["messages", friendId], (old = []) => {
+                        const exists = old.some((m) => m._id === newMessage._id);
+                        if (exists) return old;
+                        return [...old, newMessage];
+                    });
+                }
+            }
         };
 
         socket.on("newMessage", handleNewMessage);
         return () => socket.off("newMessage", handleNewMessage);
-    }, [socket, friendId, queryClient]);
+    }, [socket, friendId, groupId, queryClient, isGroupChat]);
 
     return { messages, isLoading, error, handleSendMessage, isSending };
 }

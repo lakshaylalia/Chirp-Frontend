@@ -1,11 +1,12 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useUser } from "../features/authenication/useUser";
+import Spinner from "./Spinner"
 
 function ProtectedRoute() {
     const { user, isLoading, isError } = useUser();
 
     if (isLoading) {
-        return <div>Loading...</div>;
+        return <Spinner/>;
     }
 
     if (isError || !user) {

@@ -22,23 +22,30 @@ export function useFetchUserChats(activeFriendId = null, currentUserId) {
         queryFn: async () => {
             const conversations = await getUserChats();
 
-            return conversations.map((conv) => {
-                const friend = conv.participants.find(
-                    (p) => (p._id || p).toString() !== currentUserId.toString(),
-                );
+            // Filter to only include direct conversations (type === "direct")
+            // and map to chat format
+            return conversations
+                .filter((conv) => conv.type === "direct")
+                .map((conv) => {
+                    const friend = conv.participants.find(
+                        (p) => (p._id || p).toString() !== currentUserId.toString(),
+                    );
 
-                return {
-                    friendId: (friend._id || friend).toString(),
-                    user: {
-                        name: friend.userName,
-                        avatarImage: friend.avatarImage ?? null,
-                    },
-                    lastMessage: conv.lastMessage ?? null,
-                    unreadCount: 0,
-                    isOnline: false,
-                    _raw: conv,
-                };
-            });
+                    if (!friend) return null;
+
+                    return {
+                        friendId: (friend._id || friend).toString(),
+                        user: {
+                            name: friend.userName,
+                            avatarImage: friend.avatarImage ?? null,
+                        },
+                        lastMessage: conv.lastMessage ?? null,
+                        unreadCount: 0,
+                        isOnline: false,
+                        _raw: conv,
+                    };
+                })
+                .filter(Boolean); // Remove any null entries
         },
     });
 

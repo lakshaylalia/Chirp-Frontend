@@ -7,6 +7,7 @@ const SocketContext = createContext(null);
 function SocketContextProvider({ children }) {
     const [isConnected, setIsConnected] = useState(socket.connected);
     const [onlineUsers, setOnlineUsers] = useState([]);
+    const [typingUsers, setTypingUsers] = useState({}); // { chatId: { userId: true } }
     const { user: currentUser } = useUser();
 
 
@@ -21,10 +22,34 @@ function SocketContextProvider({ children }) {
 
         socket.on("disconnect", () => setIsConnected(false));
 
+        // Handle typing indicators
+        socket.on("userTyping", ({ senderId, isTyping }) => {
+            setTypingUsers((prev) => ({
+                ...prev,
+                [senderId]: isTyping,
+            }));
+        });
+
+        socket.on("groupTyping", ({ groupId, senderId, isTyping }) => {
+            setTypingUsers((prev) => {
+                const groupTyping = prev[groupId] || {};
+                const updated = { ...prev };
+                if (isTyping) {
+                    updated[groupId] = { ...groupTyping, [senderId]: true };
+                } else {
+                    const { [senderId]: _, ...rest } = groupTyping;
+                    updated[groupId] = rest;
+                }
+                return updated;
+            });
+        });
+
         return () => {
             socket.off("connect");
             socket.off("disconnect");
             socket.off("onlineUsers");
+            socket.off("userTyping");
+            socket.off("groupTyping");
         };
     }, []);
 
@@ -43,8 +68,18 @@ function SocketContextProvider({ children }) {
         socket.emit("join", currentUser._id);
     }, [currentUser?._id, isConnected]);
 
+    const emitTyping = (receiverId, isTyping) => {
+        socket.emit("typing", { receiverId, isTyping });
+    };
+
+    const emitGroupTyping = (groupId, isTyping) => {
+        socket.emit("typingGroup", { groupId, isTyping });
+    };
+
+    const isUserTyping = (chatId) => typingUsers[chatId] && Object.keys(typingUsers[chatId]).length > 0;
+
     return (
-        <SocketContext.Provider value={{ socket, isConnected, onlineUsers  }}>
+        <SocketContext.Provider value={{ socket, isConnected, onlineUsers, emitTyping, emitGroupTyping, isUserTyping }}>
             {children}
         </SocketContext.Provider>
     );

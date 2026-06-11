@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -11,6 +11,8 @@ export default function ProfileTab() {
     const { user: currentUser } = useUser();
     const {updateUser, isPending} = useUpdateProfile();
 
+    const fileInputRef = useRef(null);
+
     const { data: profile, isLoading, error } = useQuery({
         queryKey: ["profile", userName],
         queryFn: () => getUser({ userName }),
@@ -19,7 +21,7 @@ export default function ProfileTab() {
     });
 
     const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState({ displayName: "", avatarImage: "", bio: "" });
+    const [draft, setDraft] = useState({ displayName: "", avatarFile: null, avatarPreview: "", bio: "" });
 
 
     if (isLoading) return <div className="p-6">Loading...</div>;
@@ -32,22 +34,32 @@ export default function ProfileTab() {
     function startEdit() {
         setDraft({
             displayName: profile.displayName || profile.userName || "",
-            avatarImage: profile.avatarImage || "",
+            avatarFile: null,
+            avatarPreview: profile.avatarImage || "",
             bio: profile.bio || ""
         });
         setEditing(true);
+    }
+
+    function handleAvatarChange(e) {
+        const file = e.target.files?.[0];
+        if (file) {
+            const previewUrl = URL.createObjectURL(file);
+            setDraft((d) => ({ ...d, avatarFile: file, avatarPreview: previewUrl }));
+        }
     }
 
     function saveEdit() {
         updateUser(
             {
                 displayName: draft.displayName,
-                avatarImage: draft.avatarImage,
                 bio: draft.bio,
+                avatarFile: draft.avatarFile,
             },
             {
                 onSuccess: () => {
                     setEditing(false);
+                    setDraft((d) => ({ ...d, avatarFile: null, avatarPreview: "" }));
                 },
             }
         );
@@ -56,13 +68,40 @@ export default function ProfileTab() {
     return (
         <div className="p-6 max-w-3xl mx-auto">
             <div className="flex items-center gap-6">
-                {profile.avatarImage ? (
-                    <img src={profile.avatarImage} alt={profile.displayName || profile.userName} className="w-28 h-28 rounded-full object-cover" />
-                ) : (
-                    <div className="w-28 h-28 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl">
-                        {(profile.displayName || profile.userName)?.slice(0, 2).toUpperCase()}
-                    </div>
-                )}
+                <div className="relative">
+                    {(editing ? draft.avatarPreview : profile.avatarImage) ? (
+                        <img
+                            src={editing ? draft.avatarPreview : profile.avatarImage}
+                            alt={profile.displayName || profile.userName}
+                            className="w-28 h-28 rounded-full object-cover"
+                        />
+                    ) : (
+                        <div className="w-28 h-28 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl">
+                            {(profile.displayName || profile.userName)?.slice(0, 2).toUpperCase()}
+                        </div>
+                    )}
+
+                    {editing && (
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-colors"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                    )}
+
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="hidden"
+                    />
+                </div>
 
                 <div>
                     <h2 className="text-2xl font-semibold">{profile.displayName || profile.userName}</h2>
@@ -90,13 +129,6 @@ export default function ProfileTab() {
                         onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))}
                     />
 
-                    <label className="block mb-2 text-sm">Avatar URL</label>
-                    <input
-                        className="w-full p-2 border rounded mb-3"
-                        value={draft.avatarImage}
-                        onChange={(e) => setDraft((d) => ({ ...d, avatarImage: e.target.value }))}
-                    />
-
                     <label className="block mb-2 text-sm">Bio</label>
                     <textarea
                         className="w-full p-2 border rounded mb-3"
@@ -114,7 +146,10 @@ export default function ProfileTab() {
                             {isPending ? "Saving..." : "Save"}
                         </button>
                         <button
-                            onClick={() => setEditing(false)}
+                            onClick={() => {
+                                setEditing(false);
+                                setDraft((d) => ({ ...d, avatarFile: null, avatarPreview: "" }));
+                            }}
                             disabled={isPending}
                             className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
                         >

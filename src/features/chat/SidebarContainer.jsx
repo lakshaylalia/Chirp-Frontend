@@ -5,10 +5,9 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import { Link } from "react-router-dom";
 
-import { useFetchUserChats } from "./useFetchUserChats";
+import { useFetchAllConversations } from "./useFetchAllConversations";
 import { useSearchUser } from "../users/useSearchUser";
 import { useLogout } from "../authenication/useLogout";
-import { useUserGroups } from "../groups/useGroups";
 
 import ChatListItem from "./ChatListItem";
 import SearchInput from "./SearchInput";
@@ -21,10 +20,9 @@ import {
 } from "./ChatListStates";
 
 export default function SidebarContainer({
-  activeFriendId,
+  activeFriendName,
   onSelectConversation,
   onSelectGroup,
-  onChatsLoaded,
   onCreateGroup,
 }) {
   const [searchLocal, setSearchLocal] = useState("");
@@ -32,73 +30,43 @@ export default function SidebarContainer({
   const [debouncedSearch] = useDebounce(searchNewFriend, 500);
 
   const { user: currentUser } = useUser();
-  const { chats, isLoading, error } = useFetchUserChats(
-    activeFriendId,
+  const { conversations, isLoading } = useFetchAllConversations(
+    null,
     currentUser?._id,
   );
-
-  const { data: groups } = useUserGroups();
 
   const { logOut, isPending } = useLogout();
   const { user: searchedUsers, isLoading: isSearching } = useSearchUser(debouncedSearch);
 
-  useEffect(() => {
-    if (typeof onChatsLoaded === "function") onChatsLoaded(chats || []);
-  }, [chats, onChatsLoaded]);
-
-
-  const filtered = (chats || [])
-    .filter((c) => c.user.name.toLowerCase().includes(searchLocal.toLowerCase()))
-    .filter((c) => !groups?.some((g) => g._id === c.friendId)); // Remove groups from regular chats
-
-  const filteredGroups = (groups || []).filter((g) =>
-    g.name.toLowerCase().includes(searchLocal.toLowerCase())
-  );
+  const filtered = (conversations || [])
+    .filter((c) => c.user.name?.toLowerCase().includes(searchLocal.toLowerCase()));
 
   function handleStartChat(friendId) {
     setSearchNewFriend("");
     onSelectConversation(friendId);
   }
 
+  function handleSelectItem(conversation) {
+    if (conversation.type === "group") {
+      onSelectGroup(conversation.groupId);
+    } else {
+      onSelectConversation(conversation.friendId, conversation.user.name);
+    }
+  }
+
   function renderList() {
     if (isLoading) return <ChatListSkeleton />;
-    if (error) return <ErrorState />;
-    if (chats.length === 0 && (!groups || groups.length === 0)) return <EmptyChats />;
-    if (filtered.length === 0 && filteredGroups.length === 0) return <NoSearchResults query={searchLocal} />;
+    if (conversations.length === 0) return <EmptyChats />;
+    if (filtered.length === 0) return <NoSearchResults query={searchLocal} />;
 
     return (
       <>
-        {filteredGroups.map((group) => (
-          <div
-            key={group._id}
-            onClick={() => onSelectGroup(group._id)}
-            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[var(--color-gray-50)] transition-colors border-b border-[var(--color-gray-100)]"
-          >
-            {group.avatar ? (
-              <img src={group.avatar} alt={group.name} className="w-10 h-10 rounded-full object-cover" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 text-xs font-medium flex items-center justify-center uppercase">
-                {group.name.slice(0, 2)}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--color-gray-800)] truncate">
-                {group.name}
-              </p>
-              <p className="text-xs text-[var(--color-gray-400)] truncate">
-                {group.members?.length || 0} members
-              </p>
-            </div>
-          </div>
-        ))}
         {filtered.map((conversation) => (
           <ChatListItem
-            key={conversation.friendId}
+            key={conversation.conversationId || conversation.friendId || conversation.groupId}
             conversation={conversation}
-            isActive={conversation.friendId === activeFriendId}
-            onClick={() =>
-              onSelectConversation(conversation.friendId, conversation.user.name)
-            }
+            isActive={conversation.user.name?.toLowerCase() === activeFriendName?.toLowerCase()}
+            onClick={() => handleSelectItem(conversation)}
           />
         ))}
       </>

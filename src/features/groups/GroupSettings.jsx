@@ -16,19 +16,26 @@ export default function GroupSettings({ group, onClose }) {
     const removeMember = useRemoveMember();
     const leaveGroup = useLeaveGroup();
 
-    const isAdmin = group?.admins?.some((admin) => admin._id === currentUser?._id);
-    const isMember = group?.members?.some((member) => member._id === currentUser?._id);
+    // Handle different field names from API (participants vs members, admins could be IDs or objects)
+    const members = group?.members || group?.participants || [];
+    const admins = group?.admins || group?.adminIds || [];
 
-    function handleAddMembers() {
-        if (!searchResults?.length) return;
-        const newMemberIds = searchResults
-            .filter((u) => !group.members.some((m) => m._id === u._id))
-            .map((u) => u._id);
+    // Check if current user is admin (handle both ID and object format)
+    const isAdmin = admins.some((admin) => {
+        const adminId = admin._id || admin;
+        return adminId === currentUser?._id;
+    });
 
-        if (newMemberIds.length > 0) {
-            addMembers.mutate({ groupId: group._id, memberIds: newMemberIds });
-            setSearchQuery("");
-        }
+    // Check if current user is a member
+    const isMember = members.some((member) => {
+        const memberId = member._id || member;
+        return memberId === currentUser?._id;
+    });
+
+    function handleAddMember(user) {
+        // Add one member at a time
+        addMembers.mutate({ groupId: group._id, memberIds: [user._id] });
+        setSearchQuery("");
     }
 
     function handleRemoveMember(memberId) {
@@ -75,11 +82,15 @@ export default function GroupSettings({ group, onClose }) {
                                 ) : (
                                     <ul>
                                         {searchResults
-                                            .filter((u) => !group.members.some((m) => m._id === u._id))
+                                            .filter((u) => {
+                                                // Filter out users already in the group
+                                                const memberIds = members.map(m => m._id || m);
+                                                return !memberIds.includes(u._id);
+                                            })
                                             .map((user) => (
                                                 <li
                                                     key={user._id}
-                                                    onClick={handleAddMembers}
+                                                    onClick={() => handleAddMember(user)}
                                                     className="px-3 py-2 cursor-pointer hover:bg-gray-50 flex items-center gap-2"
                                                 >
                                                     <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs flex items-center justify-center">
@@ -97,21 +108,23 @@ export default function GroupSettings({ group, onClose }) {
             )}
 
             <div>
-                <h4 className="text-sm font-medium mb-2">Members ({group.members?.length || 0})</h4>
+                <h4 className="text-sm font-medium mb-2">Members ({members.length || 0})</h4>
                 <ul className="space-y-2">
-                    {group.members?.map((member) => {
-                        const isMemberAdmin = group.admins?.some((a) => a._id === member._id);
-                        const isCurrentUser = member._id === currentUser?._id;
+                    {members.map((member) => {
+                        const memberId = member._id || member;
+                        const memberName = member.userName || member.name || "Unknown";
+                        const isMemberAdmin = admins.some((a) => (a._id || a) === memberId);
+                        const isCurrentUser = memberId === currentUser?._id;
 
                         return (
-                            <li key={member._id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                            <li key={memberId} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs flex items-center justify-center">
-                                        {member.userName.slice(0, 2)}
+                                        {memberName.slice(0, 2)}
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium">
-                                            {member.userName}
+                                            {memberName}
                                             {isMemberAdmin && <span className="ml-1 text-xs text-indigo-600">(Admin)</span>}
                                             {isCurrentUser && <span className="ml-1 text-xs text-gray-500">(You)</span>}
                                         </p>
@@ -120,7 +133,7 @@ export default function GroupSettings({ group, onClose }) {
                                 <div className="flex gap-1">
                                     {isAdmin && !isCurrentUser && (
                                         <button
-                                            onClick={() => handleRemoveMember(member._id)}
+                                            onClick={() => handleRemoveMember(memberId)}
                                             className="text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded"
                                         >
                                             Remove

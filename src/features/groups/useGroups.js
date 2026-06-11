@@ -8,6 +8,9 @@ import {
     addMembers,
     removeMember,
     leaveGroup,
+    getGroupMessages,
+    sendGroupMessage,
+    deleteGroupMessage,
 } from "../../services/apiGroup";
 import toast from "react-hot-toast";
 
@@ -121,6 +124,46 @@ export function useLeaveGroup() {
         },
         onError: (error) => {
             toast.error(error.message || "Failed to leave group");
+        },
+    });
+}
+
+export function useGetGroupMessages({ groupId }) {
+    return useQuery({
+        queryKey: ["groupMessages", groupId],
+        queryFn: () => getGroupMessages({ groupId }),
+        enabled: !!groupId,
+        staleTime: 1000 * 60 * 5,
+    });
+}
+
+export function useSendGroupMessage() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: sendGroupMessage,
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["groupMessages", variables.groupId] });
+            return data;
+        },
+        onError: (error) => {
+            toast.error(error.message || "Failed to send message");
+        },
+    });
+}
+
+export function useDeleteGroupMessage() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: deleteGroupMessage,
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["groupMessages", variables.groupId] });
+            toast.success("Message deleted");
+            return data;
+        },
+        onError: (error) => {
+            toast.error(error.message || "Failed to delete message");
         },
     });
 }

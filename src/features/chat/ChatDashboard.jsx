@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useUser } from "../authenication/useUser";
 import SidebarContainer from "./SidebarContainer";
@@ -11,11 +11,7 @@ export default function ChatDashboard() {
   const { user: currentUser } = useUser();
   const { friendName, groupId } = useParams();
 
-  const [chats, setChats] = useState([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-
-  const activeFriendId =
-    chats.find((c) => c.user.name === friendName)?.friendId ?? null;
 
   function handleFriendChatClick(friendId, friendName) {
     navigate(`/chat/${friendName}`);
@@ -25,15 +21,15 @@ export default function ChatDashboard() {
     navigate(`/group/${groupId}`);
   }
 
+  // Determine if we're in a direct chat
+  const isDirectChat = !!friendName && !groupId;
+
   return (
     <div className="flex h-screen overflow-hidden">
       <SidebarContainer
-        activeFriendId={activeFriendId}
+        activeFriendName={friendName}
         onSelectConversation={handleFriendChatClick}
         onSelectGroup={handleGroupClick}
-        onChatsLoaded={(loaded) => {
-          setChats(loaded || []);
-        }}
         onCreateGroup={() => setShowCreateGroup(true)}
       />
 
@@ -42,14 +38,16 @@ export default function ChatDashboard() {
           <div className="flex flex-col h-full">
             <GroupInfo />
             <ChatWindow
+              key={`group-${groupId}`}
               groupId={groupId}
               currentUserId={currentUser?._id}
               isGroup
             />
           </div>
-        ) : activeFriendId ? (
+        ) : isDirectChat ? (
           <ChatWindow
-            friendId={activeFriendId}
+            key={`chat-${friendName}`}
+            friendName={friendName}
             currentUserId={currentUser?._id}
           />
         ) : (

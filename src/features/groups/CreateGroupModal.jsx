@@ -27,14 +27,15 @@ export default function CreateGroupModal({ onClose }) {
     }
 
     function onSubmit({ name, avatar }) {
-        if (selectedMembers.length === 0) {
-            toast.error("Please select at least one member");
+        if (selectedMembers.length < 2) {
+            toast.error("Please select at least 2 members");
             return;
         }
 
         const formData = new FormData();
         formData.append("name", name);
-        formData.append("memberIds", JSON.stringify(selectedMembers.map((m) => m._id)));
+        // Backend expects 'participants' array
+        formData.append("participants", JSON.stringify(selectedMembers.map((m) => m._id)));
         if (avatar?.[0]) {
             formData.append("avatar", avatar[0]);
         }
@@ -81,7 +82,7 @@ export default function CreateGroupModal({ onClose }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium mb-1">Add Members</label>
+                        <label className="block text-sm font-medium mb-1">Add Members (minimum 2)</label>
                         <div className="relative">
                             <input
                                 type="text"

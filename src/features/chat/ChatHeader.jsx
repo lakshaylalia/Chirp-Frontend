@@ -1,24 +1,41 @@
 import { Link, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 import {useSocket} from "../../context/SocketContext";
 import { useGetGroup } from "../groups/useGroups";
+import { getUser } from "../../services/apiUser";
+import { formatRelativeTime } from "../../utils/timeUtils";
 
-export default function ChatHeader({ friendId, userImg, groupId, isGroup }) {
-  const { friendName } = useParams();
-  const {onlineUsers} = useSocket();
+export default function ChatHeader({ friendId, friendName: propFriendName, userImg, groupId, isGroup }) {
+  const { friendName: paramFriendName } = useParams();
+  const { onlineUsers } = useSocket();
+
+  // Use prop friendName if provided, otherwise use URL param
+  const friendName = propFriendName || paramFriendName;
 
   const { data: group } = useGetGroup({ groupId });
+
+  // Fetch user profile for lastSeen
+  const { data: userProfile } = useQuery({
+    queryKey: ["userProfile", friendId],
+    queryFn: () => getUser({ userName: friendName }),
+    enabled: !!friendId && !!friendName,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
 
   if (!friendId && !groupId) return null;
 
   if (isGroup && groupId) {
+    // Handle different field names from API
+    const members = group?.members || group?.participants || [];
+
     return (
       <div className="flex items-center justify-between border-b border-[var(--color-grey-200)] bg-[var(--color-grey-0)] px-6 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="relative">
-            {group?.avatar ? (
+            {group?.groupIcon || group?.avatar ? (
               <img
-                src={group.avatar}
+                src={group.groupIcon || group.avatar}
                 alt={group.name}
                 className="h-10 w-10 rounded-full object-cover"
               />
@@ -33,7 +50,7 @@ export default function ChatHeader({ friendId, userImg, groupId, isGroup }) {
               {group?.name || "Group"}
             </h3>
             <p className="text-xs text-[var(--color-gray-500)]">
-              {group?.members?.length || 0} members
+              {members.length || 0} members
             </p>
           </div>
         </div>
@@ -45,7 +62,7 @@ export default function ChatHeader({ friendId, userImg, groupId, isGroup }) {
 
   return (
     <div className="flex items-center justify-between border-b border-[var(--color-grey-200)] bg-[var(--color-grey-0)] px-6 py-3 shadow-sm">
-      {/* Clickable friendId profile details */}
+      {/* Clickable friend profile details */}
       <Link
         to={`/user/${friendName}`}
         className="flex items-center gap-3 hover:opacity-80 transition-opacity"
@@ -53,7 +70,7 @@ export default function ChatHeader({ friendId, userImg, groupId, isGroup }) {
         <div className="relative">
           <img
             src={userImg || "/defaultUserImage.webp"}
-            alt={friendId.name}
+            alt={friendName}
             className="h-10 w-10 rounded-full object-cover"
           />
           {/* Status Indicator Dot */}
@@ -69,7 +86,11 @@ export default function ChatHeader({ friendId, userImg, groupId, isGroup }) {
             {friendName}
           </h3>
           <p className="text-xs text-[var(--color-gray-500)]">
-            {isOnline? "Online" : "Offline"}
+            {isOnline
+              ? "Online"
+              : userProfile?.lastSeen
+                ? `Last seen ${formatRelativeTime(userProfile.lastSeen)}`
+                : "Offline"}
           </p>
         </div>
       </Link>

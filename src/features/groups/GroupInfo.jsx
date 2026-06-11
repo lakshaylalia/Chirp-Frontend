@@ -18,11 +18,15 @@ export default function GroupInfo() {
     if (isLoading) return <Spinner />;
     if (error) return <div className="p-4 text-red-500">Failed to load group info</div>;
 
+    // Handle different field names from API (participants vs members)
+    const members = group?.members || group?.participants || [];
+    const admins = group?.admins || group?.adminIds || [];
+
     return (
         <div className="p-4">
             <div className="flex items-center gap-4 mb-4">
-                {group.avatar ? (
-                    <img src={group.avatar} alt={group.name} className="w-12 h-12 rounded-full object-cover" />
+                {group.groupIcon || group.avatar ? (
+                    <img src={group.groupIcon || group.avatar} alt={group.name} className="w-12 h-12 rounded-full object-cover" />
                 ) : (
                     <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center text-lg font-medium">
                         {group.name?.slice(0, 2).toUpperCase()}
@@ -30,7 +34,7 @@ export default function GroupInfo() {
                 )}
                 <div>
                     <h2 className="font-semibold">{group.name}</h2>
-                    <p className="text-sm text-gray-500">{group.members?.length} members</p>
+                    <p className="text-sm text-gray-500">{members.length} members</p>
                 </div>
                 <button
                     onClick={() => setShowSettings(!showSettings)}

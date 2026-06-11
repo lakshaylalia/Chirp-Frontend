@@ -41,12 +41,22 @@ export async function getUser({userName}) {
     }
 };
 
-export async function updateUser({ displayName, avatarImage, bio }) {
+export async function updateUser({ displayName, bio, avatarFile }) {
     try {
-        const response = await axios.put(
+        const formData = new FormData();
+        if (displayName !== undefined) formData.append("userName", displayName);
+        if (bio !== undefined) formData.append("bio", bio);
+        if (avatarFile) formData.append("avatar", avatarFile);
+
+        const response = await axios.patch(
             `${API_URL}/user`,
-            { displayName, avatarImage, bio },
-            { withCredentials: true }
+            formData,
+            {
+                withCredentials: true,
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
         );
         return response.data.data;
     } catch (error) {

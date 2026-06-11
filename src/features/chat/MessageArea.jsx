@@ -14,7 +14,7 @@ function DateDivider({ date }) {
   );
 }
 
-export default function MessageArea({ messages = [], currentUserId, isGroup }) {
+export default function MessageArea({ messages = [], currentUserId, isGroup, onDeleteMessage }) {
   const bottomRef = useRef(null);
 
   // Auto-scroll to latest message
@@ -53,6 +53,7 @@ export default function MessageArea({ messages = [], currentUserId, isGroup }) {
               msg={msg}
               currentUserId={currentUserId}
               isGroup={isGroup}
+              onDelete={onDeleteMessage}
             />
           ))}
         </div>

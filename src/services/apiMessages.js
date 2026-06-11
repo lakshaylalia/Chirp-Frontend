@@ -19,15 +19,22 @@ export async function getMessages(friendId, isGroup = false) {
     }
 }
 
-export async function sendMessage({ receiverId, message }) {
+export async function sendMessage({ receiverId, message, imageFile }) {
     try {
+        const formData = new FormData();
+        formData.append("receiverId", receiverId);
+        if (message) formData.append("message", message);
+        if (imageFile) formData.append("image", imageFile);
+
         const response = await axios.post(
-        `${API_URL}/messages`,
-        {
-            receiverId,
-            message,
-        },
-        { withCredentials: true },
+            `${API_URL}/messages`,
+            formData,
+            {
+                withCredentials: true,
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            },
         );
         console.log(response.data);
         return response.data.data;
@@ -49,5 +56,18 @@ export async function sendGroupMessage({ groupId, message }) {
     } catch (error) {
         console.log(error.response?.data);
         throw new Error(error.response?.data?.message || "Failed to send message", { cause: error });
+    }
+}
+
+export async function deleteMessage({ messageId }) {
+    try {
+        const response = await axios.delete(`${API_URL}/messages/${messageId}`, {
+            withCredentials: true,
+        });
+        console.log(response.data);
+        return response.data.data;
+    } catch (error) {
+        console.log(error.response?.data);
+        throw new Error(error.response?.data?.message || "Failed to delete message", { cause: error });
     }
 }

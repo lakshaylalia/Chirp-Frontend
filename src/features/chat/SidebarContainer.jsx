@@ -41,9 +41,9 @@ export default function SidebarContainer({
   const filtered = (conversations || [])
     .filter((c) => c.user.name?.toLowerCase().includes(searchLocal.toLowerCase()));
 
-  function handleStartChat(friendId) {
+  function handleStartChat(userName) {
     setSearchNewFriend("");
-    onSelectConversation(friendId);
+    onSelectConversation(userName);
   }
 
   function handleSelectItem(conversation) {

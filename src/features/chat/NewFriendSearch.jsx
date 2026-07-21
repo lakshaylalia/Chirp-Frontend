@@ -16,7 +16,7 @@ export default function NewFriendSearch({ users, isSearching, query, onStartChat
           {users.map((user) => (
             <li
               key={user._id}
-              onClick={() => onStartChat(user._id)}
+              onClick={() => onStartChat(user.userName)}
               className="flex items-center gap-3 px-3 py-2.5 cursor-pointer bg-[#F5F5DC] transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-medium flex items-center justify-center uppercase flex-shrink-0">

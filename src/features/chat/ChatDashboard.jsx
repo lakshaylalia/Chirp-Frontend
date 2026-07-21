@@ -13,7 +13,7 @@ export default function ChatDashboard() {
 
   const [showCreateGroup, setShowCreateGroup] = useState(false);
 
-  function handleFriendChatClick(friendId, friendName) {
+  function handleFriendChatClick(friendName) {
     navigate(`/chat/${friendName}`);
   }
 
